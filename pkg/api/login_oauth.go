@@ -142,6 +142,7 @@ func OAuthLogin(ctx *middleware.Context) {
 	// create account if missing
 	if err == m.ErrUserNotFound {
 		if !connect.IsSignupAllowed() {
+			ctx.Logger.Info("OAuth sign up is not allowed for this adapter")
 			ctx.Redirect(setting.AppSubUrl + "/login")
 			return
 		}
@@ -151,6 +152,7 @@ func OAuthLogin(ctx *middleware.Context) {
 			return
 		}
 		if limitReached {
+			ctx.Logger.Info("Users quota reached")
 			ctx.Redirect(setting.AppSubUrl + "/login")
 			return
 		}
