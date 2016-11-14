@@ -6,7 +6,6 @@ import (
 
 	"github.com/grafana/grafana/pkg/models"
 
-	"errors"
 	"fmt"
 	"golang.org/x/oauth2"
 )
@@ -43,7 +42,7 @@ type (
 	}
 )
 
-var ErrCFNotAuthorized = errors.New("User is not a member one of the provided orgs and spaces")
+var ErrCFNotAuthorized = &AuthError{"User is not a member one of the provided orgs and spaces"}
 
 func (s *CFOAuth) Type() int {
 	return int(models.CLOUDFOUNDRY)
