@@ -42,8 +42,6 @@ type (
 	}
 )
 
-var ErrCFNotAuthorized = &AuthError{"User is not a member one of the provided orgs and spaces"}
-
 func (s *CFOAuth) Type() int {
 	return int(models.CLOUDFOUNDRY)
 }
@@ -67,43 +65,16 @@ func (s *CFOAuth) UserInfo(client *http.Client) (*BasicUserInfo, error) {
 		return nil, err
 	}
 
-	if len(s.allowedOrgs) > 0 && !s.hasAuthorizedOrg(userOrgs) {
-		return nil, ErrCFNotAuthorized
-	}
-
 	return &BasicUserInfo{
 		Name:  data.Name,
 		Login: data.Login,
 		Email: data.Email,
+		Orgs:  userOrgs,
 	}, nil
 }
 
-func (s *CFOAuth) hasAuthorizedOrg(userOrgs map[string][]string) bool {
-	for org, spaces := range s.allowedOrgs {
-		if _, ok := userOrgs[org]; !ok {
-			continue
-		}
-
-		if len(spaces) == 0 {
-			return true
-		}
-
-		if len(userOrgs[org]) > 0 {
-			for _, space := range spaces {
-				for _, userSpace := range userOrgs[org] {
-					if space == userSpace {
-						return true
-					}
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-func (s *CFOAuth) userOrgs(client *http.Client, userID string) (map[string][]string, error) {
-	userOrgs := map[string][]string{}
+func (s *CFOAuth) userOrgs(client *http.Client, userID string) ([]models.CreateOrgUserCommand, error) {
+	userOrgs := []models.CreateOrgUserCommand{}
 
 	orgsURL := fmt.Sprintf("%s/v2/users/%s/organizations?q=status:active", s.apiUrl, userID)
 	orgs, err := s.resource(client, orgsURL, nil)
@@ -122,14 +93,15 @@ func (s *CFOAuth) userOrgs(client *http.Client, userID string) (map[string][]str
 	}
 
 	for _, org := range orgs.Resources {
-		if _, ok := userOrgs[org.Entity.Name]; !ok {
-			userOrgs[org.Entity.Name] = make([]string, 0)
-		}
-
 		for _, space := range spaces.Resources {
 			if space.Entity.OrgGUID == org.Metadata.GUID {
-				userOrgs[org.Entity.Name] = append(userOrgs[org.Entity.Name], space.Entity.Name)
+				continue
 			}
+
+			userOrgs = append(userOrgs, models.CreateOrgUserCommand{
+				Name: fmt.Sprintf("%s/%s", org.Entity.Name, space.Entity.Name), // TODO: org name format
+				Role: models.ROLE_ADMIN, // TODO: set correct role
+			})
 		}
 	}
 

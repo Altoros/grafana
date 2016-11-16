@@ -11,6 +11,7 @@ import (
 	m "github.com/grafana/grafana/pkg/models"
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/util"
+	"errors"
 )
 
 func init() {
@@ -31,21 +32,21 @@ func init() {
 	bus.AddHandler("sql", SetUserHelpFlag)
 }
 
-func getOrgIdForNewUser(cmd *m.CreateUserCommand, sess *session) (int64, error) {
+func getOrgForNewUser(cmd *m.CreateUserCommand, sess *session) (*m.Org, error) {
 	if cmd.SkipOrgSetup {
-		return -1, nil
+		return nil, nil
 	}
 
-	var org m.Org
+	var org *m.Org
 
 	if setting.AutoAssignOrg {
 		// right now auto assign to org with id 1
-		has, err := sess.Where("id=?", 1).Get(&org)
+		has, err := sess.Where("id=?", 1).Get(org)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 		if has {
-			return org.Id, nil
+			return org, nil
 		} else {
 			org.Name = "Main Org."
 			org.Id = 1
@@ -60,8 +61,8 @@ func getOrgIdForNewUser(cmd *m.CreateUserCommand, sess *session) (int64, error) 
 	org.Created = time.Now()
 	org.Updated = time.Now()
 
-	if _, err := sess.Insert(&org); err != nil {
-		return 0, err
+	if _, err := sess.Insert(org); err != nil {
+		return nil, err
 	}
 
 	sess.publishAfterCommit(&events.OrgCreated{
@@ -70,14 +71,60 @@ func getOrgIdForNewUser(cmd *m.CreateUserCommand, sess *session) (int64, error) 
 		Name:      org.Name,
 	})
 
-	return org.Id, nil
+	return org, nil
+}
+
+type orgRole struct {
+	org  *m.Org
+	role m.RoleType
+}
+
+func getGroupsByName(createUserOrgs []m.CreateOrgUserCommand, sess *session) ([]*orgRole, error) {
+	orgs := make([]*orgRole, 0, len(createUserOrgs))
+
+	var org *m.Org
+	for _, userOrg := range createUserOrgs {
+		has, err := sess.Where("name = ?", userOrg.Name).Get(org)
+		if err != nil {
+			return nil, err
+		}
+
+		if has {
+			orgs = append(orgs, &orgRole{
+				org:  org,
+				role: userOrg.Role,
+			})
+		}
+	}
+
+	return orgs, nil
 }
 
 func CreateUser(cmd *m.CreateUserCommand) error {
 	return inTransaction2(func(sess *session) error {
-		orgId, err := getOrgIdForNewUser(cmd, sess)
-		if err != nil {
-			return err
+		var err error
+		var orgs []*orgRole
+
+		if len(cmd.Orgs) > 0 {
+			orgs, err = getGroupsByName(cmd.Orgs, sess)
+			if err != nil {
+				return err
+			}
+
+			if len(orgs) == 0 {
+				return errors.New("no groups found")
+			}
+		} else {
+			var org *m.Org
+			org, err = getOrgForNewUser(cmd, sess)
+			if err != nil {
+				return err
+			}
+
+			orgs = append(orgs, &orgRole{
+				org: org,
+				role: m.ROLE_ADMIN,
+			})
 		}
 
 		if cmd.Email == "" {
@@ -91,7 +138,7 @@ func CreateUser(cmd *m.CreateUserCommand) error {
 			Login:         cmd.Login,
 			Company:       cmd.Company,
 			IsAdmin:       cmd.IsAdmin,
-			OrgId:         orgId,
+			OrgId:         orgs[0].org.Id,
 			EmailVerified: cmd.EmailVerified,
 			Created:       time.Now(),
 			Updated:       time.Now(),
@@ -121,24 +168,26 @@ func CreateUser(cmd *m.CreateUserCommand) error {
 
 		// create org user link
 		if !cmd.SkipOrgSetup {
-			orgUser := m.OrgUser{
-				OrgId:   orgId,
-				UserId:  user.Id,
-				Role:    m.ROLE_ADMIN,
-				Created: time.Now(),
-				Updated: time.Now(),
-			}
-
-			if setting.AutoAssignOrg && !user.IsAdmin {
-				if len(cmd.DefaultOrgRole) > 0 {
-					orgUser.Role = m.RoleType(cmd.DefaultOrgRole)
-				} else {
-					orgUser.Role = m.RoleType(setting.AutoAssignOrgRole)
+			for _, o := range orgs {
+				orgUser := m.OrgUser{
+					OrgId:   o.org.Id,
+					UserId:  user.Id,
+					Role:    o.role,
+					Created: time.Now(),
+					Updated: time.Now(),
 				}
-			}
 
-			if _, err = sess.Insert(&orgUser); err != nil {
-				return err
+				if setting.AutoAssignOrg && !user.IsAdmin {
+					if len(cmd.DefaultOrgRole) > 0 {
+						orgUser.Role = m.RoleType(cmd.DefaultOrgRole)
+					} else {
+						orgUser.Role = m.RoleType(setting.AutoAssignOrgRole)
+					}
+				}
+
+				if _, err = sess.Insert(&orgUser); err != nil {
+					return err
+				}
 			}
 		}
 

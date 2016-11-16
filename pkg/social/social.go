@@ -7,15 +7,16 @@ import (
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 
+	"github.com/grafana/grafana/pkg/models"
 	"github.com/grafana/grafana/pkg/setting"
 )
 
 type BasicUserInfo struct {
-	Name    string
-	Email   string
-	Login   string
-	Company string
-	Role    string
+	Name  string
+	Email string
+	Login string
+	Orgs  []models.CreateOrgUserCommand
+	Role  string
 }
 
 type SocialConnector interface {

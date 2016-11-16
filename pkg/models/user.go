@@ -49,11 +49,16 @@ func (u *User) NameOrFallback() string {
 
 // ---------------------
 // COMMANDS
+type CreateOrgUserCommand struct {
+	Name string
+	Role RoleType
+}
 
 type CreateUserCommand struct {
 	Email          string
 	Login          string
 	Name           string
+	Orgs           []CreateOrgUserCommand
 	Company        string
 	OrgName        string
 	Password       string

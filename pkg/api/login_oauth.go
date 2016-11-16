@@ -173,7 +173,7 @@ func OAuthLogin(ctx *middleware.Context) {
 			Login:          userInfo.Login,
 			Email:          userInfo.Email,
 			Name:           userInfo.Name,
-			Company:        userInfo.Company,
+			Orgs:           userInfo.Orgs,
 			DefaultOrgRole: userInfo.Role,
 		}
 
