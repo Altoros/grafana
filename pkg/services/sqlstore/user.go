@@ -37,16 +37,16 @@ func getOrgForNewUser(cmd *m.CreateUserCommand, sess *session) (*m.Org, error) {
 		return nil, nil
 	}
 
-	var org *m.Org
+	var org m.Org
 
 	if setting.AutoAssignOrg {
 		// right now auto assign to org with id 1
-		has, err := sess.Where("id=?", 1).Get(org)
+		has, err := sess.Where("id=?", 1).Get(&org)
 		if err != nil {
 			return nil, err
 		}
 		if has {
-			return org, nil
+			return &org, nil
 		} else {
 			org.Name = "Main Org."
 			org.Id = 1
@@ -61,7 +61,7 @@ func getOrgForNewUser(cmd *m.CreateUserCommand, sess *session) (*m.Org, error) {
 	org.Created = time.Now()
 	org.Updated = time.Now()
 
-	if _, err := sess.Insert(org); err != nil {
+	if _, err := sess.Insert(&org); err != nil {
 		return nil, err
 	}
 
@@ -71,7 +71,7 @@ func getOrgForNewUser(cmd *m.CreateUserCommand, sess *session) (*m.Org, error) {
 		Name:      org.Name,
 	})
 
-	return org, nil
+	return &org, nil
 }
 
 type orgRole struct {
