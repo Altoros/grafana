@@ -82,7 +82,7 @@ type orgRole struct {
 func getGroupsByName(createUserOrgs []m.CreateOrgUserCommand, sess *session) ([]*orgRole, error) {
 	orgs := make([]*orgRole, 0, len(createUserOrgs))
 
-	var org *m.Org
+	org := &m.Org{}
 	for _, userOrg := range createUserOrgs {
 		has, err := sess.Where("name = ?", userOrg.Name).Get(org)
 		if err != nil {

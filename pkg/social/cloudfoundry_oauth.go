@@ -99,7 +99,7 @@ func (s *CFOAuth) userOrgs(client *http.Client, userID string) ([]models.CreateO
 			}
 
 			userOrgs = append(userOrgs, models.CreateOrgUserCommand{
-				Name: fmt.Sprintf("%s/%s", org.Entity.Name, space.Entity.Name), // TODO: org name format
+				Name: fmt.Sprintf("%s-%s", org.Entity.Name, space.Entity.Name),
 				Role: models.ROLE_ADMIN, // TODO: set correct role
 			})
 		}
