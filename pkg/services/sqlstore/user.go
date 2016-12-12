@@ -110,10 +110,6 @@ func CreateUser(cmd *m.CreateUserCommand) error {
 			if err != nil {
 				return err
 			}
-
-			if len(orgs) == 0 {
-				return errors.New("no groups found")
-			}
 		} else {
 			var org *m.Org
 			org, err = getOrgForNewUser(cmd, sess)
@@ -129,6 +125,10 @@ func CreateUser(cmd *m.CreateUserCommand) error {
 
 		if cmd.Email == "" {
 			cmd.Email = cmd.Login
+		}
+
+		if len(orgs) == 0 {
+			return errors.New("no groups found")
 		}
 
 		// create user

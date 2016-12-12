@@ -16,13 +16,11 @@ type (
 		uaaUrl      string
 		apiUrl      string
 		allowSignUp bool
-		allowedOrgs map[string][]string
 	}
 
 	CFUserInfo struct {
 		UserID   string `json:"user_id"`
 		Name     string `json:"name"`
-		Login    string `json:"login"`
 		Username string `json:"user_name"`
 		Email    string `json:"email"`
 	}
@@ -67,7 +65,7 @@ func (s *CFOAuth) UserInfo(client *http.Client) (*BasicUserInfo, error) {
 
 	return &BasicUserInfo{
 		Name:  data.Name,
-		Login: data.Login,
+		Login: data.Username,
 		Email: data.Email,
 		Orgs:  userOrgs,
 	}, nil
@@ -103,6 +101,10 @@ func (s *CFOAuth) userOrgs(client *http.Client, userID string) ([]models.CreateO
 				Role: models.ROLE_ADMIN, // TODO: set correct role
 			})
 		}
+	}
+
+	if len(userOrgs) == 0 {
+		return nil, &AuthError{"user doesn't belong to any groups"}
 	}
 
 	return userOrgs, nil

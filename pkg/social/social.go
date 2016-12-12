@@ -117,26 +117,11 @@ func NewOAuthService() {
 				TokenURL: uaaUrl + "/oauth/token",
 			}
 
-			allowedOrgsRaw := sec.Key("allowed_organizations").Strings(" ")
-			allowedOrgs := map[string][]string{}
-			for _, org := range allowedOrgsRaw {
-				chunks := strings.SplitN(org, "/", 2)
-
-				if _, ok := allowedOrgs[chunks[0]]; !ok {
-					allowedOrgs[chunks[0]] = make([]string, 0)
-				}
-
-				if len(chunks) == 2 && chunks[1] != "" {
-					allowedOrgs[chunks[0]] = append(allowedOrgs[chunks[0]], chunks[1])
-				}
-			}
-
 			SocialMap["cloudfoundry"] = &CFOAuth{
 				Config:      &config,
 				uaaUrl:      uaaUrl,
 				apiUrl:      info.ApiUrl,
 				allowSignUp: info.AllowSignup,
-				allowedOrgs: allowedOrgs,
 			}
 		}
 

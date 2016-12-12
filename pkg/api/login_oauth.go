@@ -169,6 +169,7 @@ func OAuthLogin(ctx *middleware.Context) {
 			redirectWithError(ctx, LOGIN_PATH, ErrUsersQuotaReached)
 			return
 		}
+
 		cmd := m.CreateUserCommand{
 			Login:          userInfo.Login,
 			Email:          userInfo.Email,
