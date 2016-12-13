@@ -65,6 +65,10 @@ func (s *CFOAuth) UserInfo(client *http.Client) (*BasicUserInfo, error) {
 		return nil, err
 	}
 
+	if len(userOrgs) == 0 {
+		return nil, &AuthError{"no ogrs found"}
+	}
+
 	// cf doesn't store user emails and returns username instead
 	if !strings.Contains(data.Email, "@") && s.defaultEmailDomain != "" {
 		data.Email = data.Email + "@" + s.defaultEmailDomain
