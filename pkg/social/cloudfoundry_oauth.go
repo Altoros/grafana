@@ -103,7 +103,7 @@ func (s *CFOAuth) userOrgs(client *http.Client, userID string) ([]models.CreateO
 
 	for _, org := range orgs.Resources {
 		for _, space := range spaces.Resources {
-			if space.Entity.OrgGUID == org.Metadata.GUID {
+			if space.Entity.OrgGUID != org.Metadata.GUID {
 				continue
 			}
 
