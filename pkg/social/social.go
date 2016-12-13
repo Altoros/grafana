@@ -118,10 +118,11 @@ func NewOAuthService() {
 			}
 
 			SocialMap["cloudfoundry"] = &CFOAuth{
-				Config:      &config,
-				uaaUrl:      uaaUrl,
-				apiUrl:      info.ApiUrl,
-				allowSignUp: info.AllowSignup,
+				Config:             &config,
+				uaaUrl:             uaaUrl,
+				apiUrl:             info.ApiUrl,
+				allowSignUp:        info.AllowSignup,
+				defaultEmailDomain: sec.Key("default_email_domain").String(),
 			}
 		}
 

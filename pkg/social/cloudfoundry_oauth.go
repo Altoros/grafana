@@ -8,14 +8,16 @@ import (
 
 	"fmt"
 	"golang.org/x/oauth2"
+	"strings"
 )
 
 type (
 	CFOAuth struct {
 		*oauth2.Config
-		uaaUrl      string
-		apiUrl      string
-		allowSignUp bool
+		uaaUrl             string
+		apiUrl             string
+		allowSignUp        bool
+		defaultEmailDomain string
 	}
 
 	CFUserInfo struct {
@@ -61,6 +63,11 @@ func (s *CFOAuth) UserInfo(client *http.Client) (*BasicUserInfo, error) {
 	userOrgs, err := s.userOrgs(client, data.UserID)
 	if err != nil {
 		return nil, err
+	}
+
+	// cf doesn't store user emails and returns username instead
+	if !strings.Contains(data.Email, "@") && s.defaultEmailDomain != "" {
+		data.Email = data.Email + "@" + s.defaultEmailDomain
 	}
 
 	return &BasicUserInfo{
