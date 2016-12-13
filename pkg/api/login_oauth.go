@@ -179,7 +179,7 @@ func OAuthLogin(ctx *middleware.Context) {
 		}
 
 		if err = bus.Dispatch(&cmd); err != nil {
-			ctx.Handle(500, "Failed to create account", err)
+			redirectWithError(ctx, LOGIN_PATH, err)
 			return
 		}
 
