@@ -12,7 +12,6 @@ import (
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/util"
 	"errors"
-	"fmt"
 )
 
 func init() {
