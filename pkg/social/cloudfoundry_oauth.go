@@ -46,6 +46,10 @@ func (s *CFOAuth) Type() int {
 	return int(models.CLOUDFOUNDRY)
 }
 
+func (s *CFOAuth) Scopes() []string {
+	return s.Config.Scopes
+}
+
 func (s *CFOAuth) IsEmailAllowed(email string) bool {
 	return true
 }
