@@ -32,6 +32,9 @@ function (angular, _, coreModule, config) {
       // cookie key from pkg/api/login_oauth.go:25
       var message = $cookies.get("grafana_last_error");
       if (message) {
+        message = message.replace(/\+/g, '%20');
+        message = decodeURIComponent(message);
+
         $scope.appEvent('alert-warning', ['Login Failed', message]);
         $cookies.remove("grafana_last_error");
       }
