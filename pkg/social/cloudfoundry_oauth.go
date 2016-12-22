@@ -132,7 +132,7 @@ func (s *CFOAuth) userOrgs(client *http.Client, user *CFUserInfo) ([]models.Crea
 				},
 				{
 					url:  space.Entity.DevelopersURL,
-					role: models.ROLE_READ_ONLY_EDITOR,
+					role: models.ROLE_EDITOR,
 				},
 				{
 					url:  space.Entity.ManagersURL,
