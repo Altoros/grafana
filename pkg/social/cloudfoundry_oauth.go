@@ -28,17 +28,23 @@ type (
 	}
 
 	CFResource struct {
-		NextURL   string `json:"next_url"`
-		Resources []struct {
-			Metadata struct {
-				GUID string `json:"guid"`
-			} `json:"metadata"`
+		NextURL   string           `json:"next_url"`
+		Resources []CFResourceItem `json:"resources"`
+	}
 
-			Entity struct {
-				Name    string `json:"name"`
-				OrgGUID string `json:"organization_guid"`
-			} `json:"entity"`
-		} `json:"resources"`
+	CFResourceItem struct {
+		Metadata struct {
+			GUID string `json:"guid"`
+		} `json:"metadata"`
+
+		Entity struct {
+			Name          string `json:"name"`
+			OrgGUID       string `json:"organization_guid"`
+			Username      string `json:"username"`
+			DevelopersURL string `json:"developers_url"`
+			AuditorsURL   string `json:"auditors_url"`
+			ManagersURL   string `json:"managers_url"`
+		} `json:"entity"`
 	}
 )
 
@@ -59,12 +65,12 @@ func (s *CFOAuth) IsSignupAllowed() bool {
 }
 
 func (s *CFOAuth) UserInfo(client *http.Client) (*BasicUserInfo, error) {
-	var data CFUserInfo
-	if err := s.request(client, s.uaaUrl+"/userinfo", &data); err != nil {
+	user := &CFUserInfo{}
+	if err := s.request(client, s.uaaUrl+"/userinfo", user); err != nil {
 		return nil, err
 	}
 
-	userOrgs, err := s.userOrgs(client, data.UserID)
+	userOrgs, err := s.userOrgs(client, user)
 	if err != nil {
 		return nil, err
 	}
@@ -73,27 +79,27 @@ func (s *CFOAuth) UserInfo(client *http.Client) (*BasicUserInfo, error) {
 		return nil, &AuthError{"no ogrs found"}
 	}
 
-	if data.Username == "admin" {
-		data.Email = "admin@localhost"
+	if user.Username == "admin" {
+		user.Email = "admin@localhost"
 	}
 
 	// cf doesn't store user emails and returns username instead
-	if !strings.Contains(data.Email, "@") && s.defaultEmailDomain != "" {
-		data.Email = data.Email + "@" + s.defaultEmailDomain
+	if !strings.Contains(user.Email, "@") && s.defaultEmailDomain != "" {
+		user.Email = user.Email + "@" + s.defaultEmailDomain
 	}
 
 	return &BasicUserInfo{
-		Name:    data.Name,
-		Login:   data.Username,
-		Email:   data.Email,
-		Orgs:    userOrgs,
+		Name:  user.Name,
+		Login: user.Username,
+		Email: user.Email,
+		Orgs:  userOrgs,
 	}, nil
 }
 
-func (s *CFOAuth) userOrgs(client *http.Client, userID string) ([]models.CreateOrgUserCommand, error) {
+func (s *CFOAuth) userOrgs(client *http.Client, user *CFUserInfo) ([]models.CreateOrgUserCommand, error) {
 	userOrgs := []models.CreateOrgUserCommand{}
 
-	orgsURL := fmt.Sprintf("%s/v2/users/%s/organizations?q=status:active", s.apiUrl, userID)
+	orgsURL := fmt.Sprintf("%s/v2/users/%s/organizations?q=status:active", s.apiUrl, user.UserID)
 	orgs, err := s.resource(client, orgsURL, nil)
 	if err != nil {
 		return nil, err
@@ -103,7 +109,7 @@ func (s *CFOAuth) userOrgs(client *http.Client, userID string) ([]models.CreateO
 		return userOrgs, nil
 	}
 
-	spacesURL := fmt.Sprintf("%s/v2/users/%s/spaces", s.apiUrl, userID)
+	spacesURL := fmt.Sprintf("%s/v2/users/%s/spaces", s.apiUrl, user.UserID)
 	spaces, err := s.resource(client, spacesURL, nil)
 	if err != nil {
 		return nil, err
@@ -115,9 +121,38 @@ func (s *CFOAuth) userOrgs(client *http.Client, userID string) ([]models.CreateO
 				continue
 			}
 
+			var role models.RoleType
+			for _, req := range []struct {
+				url  string
+				role models.RoleType
+			}{
+				{
+					url:  space.Entity.AuditorsURL,
+					role: models.ROLE_VIEWER,
+				},
+				{
+					url:  space.Entity.DevelopersURL,
+					role: models.ROLE_READ_ONLY_EDITOR,
+				},
+				{
+					url:  space.Entity.ManagersURL,
+					role: models.ROLE_ADMIN,
+				},
+			} {
+				ok, err := s.spaceRole(client, s.apiUrl + req.url, user.Username)
+				if err != nil {
+					return nil, err
+				}
+
+				if ok {
+					role = req.role
+					break
+				}
+			}
+
 			userOrgs = append(userOrgs, models.CreateOrgUserCommand{
 				Name: fmt.Sprintf("%s-%s", org.Entity.Name, space.Entity.Name),
-				Role: models.ROLE_ADMIN, // TODO: set correct role
+				Role: role,
 			})
 		}
 	}
@@ -127,6 +162,21 @@ func (s *CFOAuth) userOrgs(client *http.Client, userID string) ([]models.CreateO
 	}
 
 	return userOrgs, nil
+}
+
+func (s *CFOAuth) spaceRole(client *http.Client, url, username string) (bool, error) {
+	resource, err := s.resource(client, url, nil)
+	if err != nil {
+		return false, err
+	}
+
+	for _, auditor := range resource.Resources {
+		if auditor.Entity.Username == username {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (s *CFOAuth) request(client *http.Client, url string, v interface{}) error {
