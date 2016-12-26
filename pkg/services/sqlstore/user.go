@@ -6,12 +6,13 @@ import (
 
 	"github.com/go-xorm/xorm"
 
+	"errors"
 	"github.com/grafana/grafana/pkg/bus"
 	"github.com/grafana/grafana/pkg/events"
 	m "github.com/grafana/grafana/pkg/models"
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/util"
-	"errors"
+	"fmt"
 )
 
 func init() {
@@ -30,6 +31,7 @@ func init() {
 	bus.AddHandler("sql", SetUsingOrg)
 	bus.AddHandler("sql", UpdateUserPermissions)
 	bus.AddHandler("sql", SetUserHelpFlag)
+	bus.AddHandler("sql", UpdateUserLogin)
 }
 
 func getOrgForNewUser(cmd *m.CreateUserCommand, sess *session) (*m.Org, error) {
@@ -100,6 +102,84 @@ func getGroupsByName(createUserOrgs []m.CreateOrgUserCommand, sess *session) ([]
 	return orgs, nil
 }
 
+type userOrgDTO struct{
+	ID    int64
+	OrgId int64
+	Name  string
+}
+
+func UpdateUserLogin(cmd *m.UpdateUserLoginCommand) error {
+	return inTransaction2(func(sess *session) error {
+		userOrgs := make([]*userOrgDTO, 0, len(cmd.Orgs))
+
+		q := x.Table("org_user")
+		q = q.Join("INNER", "org", "org_user.org_id = org.id")
+		q = q.Where("org_user.user_id = ?", cmd.UserID)
+		q = q.Cols("org_user.id", "org_user.org_id", "org.name")
+
+		if err := q.Find(&userOrgs); err != nil {
+			return err
+		}
+
+		userOrgIDs := make([]string, 0, len(userOrgs))
+		for _, userOrg := range userOrgs {
+			userOrgIDs = append(userOrgIDs, fmt.Sprintf("%d", userOrg.OrgId))
+		}
+
+		_, err := sess.Exec(
+			"DELETE FROM org_user WHERE org_id NOT IN (?) AND user_id = ?",
+			strings.Join(userOrgIDs, ", "),
+			cmd.UserID,
+		)
+
+		if err != nil {
+			return err
+		}
+
+		for _, org := range cmd.Orgs {
+			var existingOrg *userOrgDTO
+			for _, userOrg := range userOrgs {
+				if userOrg.Name == org.Name {
+					existingOrg = userOrg
+					break
+				}
+			}
+
+			if existingOrg != nil {
+				_, err := sess.Id(existingOrg.ID).Update(&m.OrgUser{
+					Role: org.Role,
+				})
+
+				if err != nil {
+					return err
+				}
+			} else {
+				o := &m.Org{}
+				has, err := sess.Where("name = ?", org.Name).Get(o)
+				if err != nil {
+					return err
+				}
+
+				if has {
+					orgUser := m.OrgUser{
+						OrgId: o.Id,
+						UserId: cmd.UserID,
+						Role: org.Role,
+						Created: time.Now(),
+						Updated: time.Now(),
+					}
+
+					if _, err = sess.Insert(&orgUser); err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		return nil
+	})
+}
+
 func CreateUser(cmd *m.CreateUserCommand) error {
 	return inTransaction2(func(sess *session) error {
 		var err error
@@ -119,7 +199,7 @@ func CreateUser(cmd *m.CreateUserCommand) error {
 			}
 
 			orgs = append(orgs, &orgRole{
-				org: org,
+				org:  org,
 				role: m.ROLE_ADMIN,
 			})
 		}

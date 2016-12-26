@@ -70,6 +70,11 @@ type CreateUserCommand struct {
 	Result User
 }
 
+type UpdateUserLoginCommand struct {
+	UserID int64
+	Orgs   []CreateOrgUserCommand
+}
+
 type UpdateUserCommand struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`

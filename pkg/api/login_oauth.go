@@ -196,6 +196,14 @@ func OAuthLogin(ctx *middleware.Context) {
 	}
 
 	// login
+	if err = bus.Dispatch(&m.UpdateUserLoginCommand{
+		UserID: userQuery.Result.Id,
+		Orgs:   userInfo.Orgs,
+	}); err != nil {
+		redirectWithError(ctx, LOGIN_PATH, err)
+		return
+	}
+
 	loginUserWithUser(userQuery.Result, ctx)
 
 	metrics.M_Api_Login_OAuth.Inc(1)
