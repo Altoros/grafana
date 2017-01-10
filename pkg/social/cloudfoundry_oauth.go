@@ -125,16 +125,16 @@ func (s *CFOAuth) userOrgs(client *http.Client, user *CFUserInfo) ([]models.Crea
 				role models.RoleType
 			}{
 				{
-					url:  space.Entity.AuditorsURL,
-					role: models.ROLE_VIEWER,
+					url:  space.Entity.ManagersURL,
+					role: models.ROLE_ADMIN,
 				},
 				{
 					url:  space.Entity.DevelopersURL,
 					role: models.ROLE_EDITOR,
 				},
 				{
-					url:  space.Entity.ManagersURL,
-					role: models.ROLE_ADMIN,
+					url:  space.Entity.AuditorsURL,
+					role: models.ROLE_VIEWER,
 				},
 			} {
 				ok, err := s.spaceRole(client, s.apiUrl+req.url, user.Username)
