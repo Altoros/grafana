@@ -12,11 +12,12 @@ import (
 )
 
 type BasicUserInfo struct {
-	Name  string
-	Email string
-	Login string
-	Orgs  []models.CreateOrgUserCommand
-	Role  string
+	Name    string
+	Email   string
+	Login   string
+	Orgs    []models.CreateOrgUserCommand
+	Role    string
+	IsAdmin bool
 }
 
 type SocialConnector interface {

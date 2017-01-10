@@ -183,6 +183,7 @@ func OAuthLogin(ctx *middleware.Context) {
 			Name:           userInfo.Name,
 			Orgs:           userInfo.Orgs,
 			DefaultOrgRole: userInfo.Role,
+			IsAdmin:        userInfo.IsAdmin,
 		}
 
 		if err = bus.Dispatch(&cmd); err != nil {
@@ -197,8 +198,9 @@ func OAuthLogin(ctx *middleware.Context) {
 
 	// login
 	if err = bus.Dispatch(&m.UpdateUserLoginCommand{
-		UserID: userQuery.Result.Id,
-		Orgs:   userInfo.Orgs,
+		UserID:  userQuery.Result.Id,
+		Orgs:    userInfo.Orgs,
+		IsAdmin: userInfo.IsAdmin,
 	}); err != nil {
 		redirectWithError(ctx, LOGIN_PATH, err)
 		return

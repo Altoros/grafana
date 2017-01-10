@@ -71,8 +71,9 @@ type CreateUserCommand struct {
 }
 
 type UpdateUserLoginCommand struct {
-	UserID int64
-	Orgs   []CreateOrgUserCommand
+	UserID  int64
+	Orgs    []CreateOrgUserCommand
+	IsAdmin bool
 }
 
 type UpdateUserCommand struct {

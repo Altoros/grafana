@@ -79,7 +79,8 @@ func (s *CFOAuth) UserInfo(client *http.Client) (*BasicUserInfo, error) {
 		return nil, &AuthError{"no ogrs found"}
 	}
 
-	if user.Username == "admin" {
+	isAdmin := user.Username == "admin"
+	if isAdmin {
 		user.Email = "admin@localhost"
 	}
 
@@ -89,10 +90,11 @@ func (s *CFOAuth) UserInfo(client *http.Client) (*BasicUserInfo, error) {
 	}
 
 	return &BasicUserInfo{
-		Name:  user.Name,
-		Login: user.Username,
-		Email: user.Email,
-		Orgs:  userOrgs,
+		Name:    user.Name,
+		Login:   user.Username,
+		Email:   user.Email,
+		Orgs:    userOrgs,
+		IsAdmin: isAdmin,
 	}, nil
 }
 
@@ -139,7 +141,7 @@ func (s *CFOAuth) userOrgs(client *http.Client, user *CFUserInfo) ([]models.Crea
 					role: models.ROLE_ADMIN,
 				},
 			} {
-				ok, err := s.spaceRole(client, s.apiUrl + req.url, user.Username)
+				ok, err := s.spaceRole(client, s.apiUrl+req.url, user.Username)
 				if err != nil {
 					return nil, err
 				}

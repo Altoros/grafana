@@ -7,12 +7,12 @@ import (
 	"github.com/go-xorm/xorm"
 
 	"errors"
+	"fmt"
 	"github.com/grafana/grafana/pkg/bus"
 	"github.com/grafana/grafana/pkg/events"
 	m "github.com/grafana/grafana/pkg/models"
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/util"
-	"fmt"
 )
 
 func init() {
@@ -102,7 +102,7 @@ func getGroupsByName(createUserOrgs []m.CreateOrgUserCommand, sess *session) ([]
 	return orgs, nil
 }
 
-type userOrgDTO struct{
+type userOrgDTO struct {
 	ID    int64
 	OrgId int64
 	Name  string
@@ -162,9 +162,9 @@ func UpdateUserLogin(cmd *m.UpdateUserLoginCommand) error {
 
 				if has {
 					orgUser := m.OrgUser{
-						OrgId: o.Id,
-						UserId: cmd.UserID,
-						Role: org.Role,
+						OrgId:   o.Id,
+						UserId:  cmd.UserID,
+						Role:    org.Role,
 						Created: time.Now(),
 						Updated: time.Now(),
 					}
