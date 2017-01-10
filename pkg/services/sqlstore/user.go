@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-xorm/xorm"
 
-	"errors"
 	"fmt"
 	"github.com/grafana/grafana/pkg/bus"
 	"github.com/grafana/grafana/pkg/events"
@@ -208,8 +207,9 @@ func CreateUser(cmd *m.CreateUserCommand) error {
 			cmd.Email = cmd.Login
 		}
 
-		if len(orgs) == 0 {
-			return errors.New("no groups found")
+		var orgId int64
+		if len(orgs) > 0 {
+			orgId = orgs[0].org.Id
 		}
 
 		// create user
@@ -219,7 +219,7 @@ func CreateUser(cmd *m.CreateUserCommand) error {
 			Login:         cmd.Login,
 			Company:       cmd.Company,
 			IsAdmin:       cmd.IsAdmin,
-			OrgId:         orgs[0].org.Id,
+			OrgId:         orgId,
 			EmailVerified: cmd.EmailVerified,
 			Created:       time.Now(),
 			Updated:       time.Now(),

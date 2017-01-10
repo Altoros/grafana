@@ -75,10 +75,6 @@ func (s *CFOAuth) UserInfo(client *http.Client) (*BasicUserInfo, error) {
 		return nil, err
 	}
 
-	if len(userOrgs) == 0 {
-		return nil, &AuthError{"no ogrs found"}
-	}
-
 	isAdmin := user.Username == "admin"
 	if isAdmin {
 		user.Email = "admin@localhost"
