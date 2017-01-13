@@ -2,14 +2,13 @@ package social
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/grafana/grafana/pkg/models"
 
-	"fmt"
 	"golang.org/x/oauth2"
-	"io/ioutil"
-	"strings"
 )
 
 type (
@@ -40,10 +39,8 @@ type (
 		NextURL   string `json:"next_url"`
 		Resources []struct {
 			Metadata CFMetadata `json:"metadata"`
-
-			Entity struct {
-				Name string `json:"name"`
-
+			Entity   struct {
+				Name       string   `json:"name"`
 				Managers   []CFRole `json:"managers"`
 				Developers []CFRole `json:"developers"`
 				Auditors   []CFRole `json:"auditors"`
