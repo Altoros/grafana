@@ -108,6 +108,10 @@ type userOrgDTO struct {
 }
 
 func UpdateUserLogin(cmd *m.UpdateUserLoginCommand) error {
+	if cmd.IsAdmin {
+		return nil
+	}
+
 	return inTransaction2(func(sess *session) error {
 		userOrgs := make([]*userOrgDTO, 0, len(cmd.Orgs))
 
@@ -249,6 +253,10 @@ func CreateUser(cmd *m.CreateUserCommand) error {
 
 		// create org user link
 		if !cmd.SkipOrgSetup {
+			if cmd.IsAdmin {
+				return nil
+			}
+
 			for _, o := range orgs {
 				orgUser := m.OrgUser{
 					OrgId:   o.org.Id,
