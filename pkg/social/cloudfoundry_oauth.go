@@ -8,6 +8,7 @@ import (
 
 	"fmt"
 	"golang.org/x/oauth2"
+	"io/ioutil"
 	"strings"
 )
 
@@ -27,24 +28,27 @@ type (
 		Email    string `json:"email"`
 	}
 
-	CFResource struct {
-		NextURL   string           `json:"next_url"`
-		Resources []CFResourceItem `json:"resources"`
+	CFMetadata struct {
+		GUID string `json:"guid"`
 	}
 
-	CFResourceItem struct {
-		Metadata struct {
-			GUID string `json:"guid"`
-		} `json:"metadata"`
+	CFRole struct {
+		Metadata CFMetadata `json:"metadata"`
+	}
 
-		Entity struct {
-			Name          string `json:"name"`
-			OrgGUID       string `json:"organization_guid"`
-			Username      string `json:"username"`
-			DevelopersURL string `json:"developers_url"`
-			AuditorsURL   string `json:"auditors_url"`
-			ManagersURL   string `json:"managers_url"`
-		} `json:"entity"`
+	CFResource struct {
+		NextURL   string `json:"next_url"`
+		Resources []struct {
+			Metadata CFMetadata `json:"metadata"`
+
+			Entity struct {
+				Name string `json:"name"`
+
+				Managers   []CFRole `json:"managers"`
+				Developers []CFRole `json:"developers"`
+				Auditors   []CFRole `json:"auditors"`
+			} `json:"entity"`
+		} `json:"resources"`
 	}
 )
 
@@ -94,10 +98,12 @@ func (s *CFOAuth) UserInfo(client *http.Client) (*BasicUserInfo, error) {
 	}, nil
 }
 
+const spaceURLTpl = "%s/v2/organizations/%s/spaces?order-by=name&inline-relations-depth=1"
+
 func (s *CFOAuth) userOrgs(client *http.Client, user *CFUserInfo) ([]models.CreateOrgUserCommand, error) {
 	userOrgs := []models.CreateOrgUserCommand{}
 
-	orgsURL := fmt.Sprintf("%s/v2/users/%s/organizations?q=status:active", s.apiUrl, user.UserID)
+	orgsURL := fmt.Sprintf("%s/v2/users/%s/organizations", s.apiUrl, user.UserID)
 	orgs, err := s.resource(client, orgsURL, nil)
 	if err != nil {
 		return nil, err
@@ -107,74 +113,36 @@ func (s *CFOAuth) userOrgs(client *http.Client, user *CFUserInfo) ([]models.Crea
 		return userOrgs, nil
 	}
 
-	spacesURL := fmt.Sprintf("%s/v2/users/%s/spaces", s.apiUrl, user.UserID)
-	spaces, err := s.resource(client, spacesURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, org := range orgs.Resources {
-		for _, space := range spaces.Resources {
-			if space.Entity.OrgGUID != org.Metadata.GUID {
-				continue
-			}
+		spaceURL := fmt.Sprintf(spaceURLTpl, s.apiUrl, org.Metadata.GUID)
 
-			var role models.RoleType
-			for _, req := range []struct {
-				url  string
-				role models.RoleType
-			}{
-				{
-					url:  space.Entity.ManagersURL,
-					role: models.ROLE_ADMIN,
-				},
-				{
-					url:  space.Entity.DevelopersURL,
-					role: models.ROLE_EDITOR,
-				},
-				{
-					url:  space.Entity.AuditorsURL,
-					role: models.ROLE_VIEWER,
-				},
-			} {
-				ok, err := s.spaceRole(client, s.apiUrl+req.url, user.Username)
-				if err != nil {
-					return nil, err
-				}
-
-				if ok {
-					role = req.role
-					break
-				}
-			}
-
-			userOrgs = append(userOrgs, models.CreateOrgUserCommand{
-				Name: fmt.Sprintf("%s-%s", org.Entity.Name, space.Entity.Name),
-				Role: role,
-			})
+		spaces, err := s.resource(client, spaceURL, nil)
+		if err != nil {
+			return nil, err
 		}
-	}
 
-	if len(userOrgs) == 0 {
-		return nil, &AuthError{"user doesn't belong to any groups"}
+		for _, space := range spaces.Resources {
+		loop:
+			for roleType, roles := range map[models.RoleType][]CFRole{
+				models.ROLE_ADMIN:  space.Entity.Managers,
+				models.ROLE_EDITOR: space.Entity.Developers,
+				models.ROLE_VIEWER: space.Entity.Auditors,
+			} {
+				for _, role := range roles {
+					if role.Metadata.GUID == user.UserID {
+						userOrgs = append(userOrgs, models.CreateOrgUserCommand{
+							Name: fmt.Sprintf("%s-%s", org.Entity.Name, space.Entity.Name),
+							Role: roleType,
+						})
+
+						break loop
+					}
+				}
+			}
+		}
 	}
 
 	return userOrgs, nil
-}
-
-func (s *CFOAuth) spaceRole(client *http.Client, url, username string) (bool, error) {
-	resource, err := s.resource(client, url, nil)
-	if err != nil {
-		return false, err
-	}
-
-	for _, auditor := range resource.Resources {
-		if auditor.Entity.Username == username {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 func (s *CFOAuth) request(client *http.Client, url string, v interface{}) error {
@@ -193,7 +161,7 @@ func (s *CFOAuth) request(client *http.Client, url string, v interface{}) error 
 }
 
 func (s *CFOAuth) resource(client *http.Client, url string, prev *CFResource) (*CFResource, error) {
-	next := CFResource{}
+	next := &CFResource{}
 
 	if err := s.request(client, url, &next); err != nil {
 		return nil, err
@@ -204,8 +172,8 @@ func (s *CFOAuth) resource(client *http.Client, url string, prev *CFResource) (*
 	}
 
 	if next.NextURL != "" {
-		return s.resource(client, next.NextURL, &next)
+		return s.resource(client, next.NextURL, next)
 	}
 
-	return &next, nil
+	return next, nil
 }
