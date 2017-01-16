@@ -102,7 +102,7 @@ func getGroupsByName(createUserOrgs []m.CreateOrgUserCommand, sess *session) ([]
 }
 
 type userOrgDTO struct {
-	ID    int64
+	Id    int64
 	OrgId int64
 	Name  string
 }
@@ -115,31 +115,34 @@ func UpdateUserLogin(cmd *m.UpdateUserLoginCommand) error {
 	return inTransaction2(func(sess *session) error {
 		userOrgs := make([]*userOrgDTO, 0, len(cmd.Orgs))
 
-		q := x.Table("org_user")
-		q = q.Join("INNER", "org", "org_user.org_id = org.id")
-		q = q.Where("org_user.user_id = ?", cmd.UserID)
-		q = q.Cols("org_user.id", "org_user.org_id", "org.name")
-
-		if err := q.Find(&userOrgs); err != nil {
-			return err
-		}
-
-		userOrgIDs := make([]string, 0, len(userOrgs))
-		for _, userOrg := range userOrgs {
-			userOrgIDs = append(userOrgIDs, fmt.Sprintf("%d", userOrg.OrgId))
-		}
-
-		_, err := sess.Exec(
-			"DELETE FROM org_user WHERE org_id NOT IN (?) AND user_id = ?",
-			strings.Join(userOrgIDs, ", "),
-			cmd.UserID,
-		)
+		err := x.Table("org_user").
+			Join("INNER", "org", "org_user.org_id = org.id").
+			Where("org_user.user_id = ?", cmd.UserID).
+			Cols("org_user.id", "org_user.org_id", "org.name").
+			Find(&userOrgs)
 
 		if err != nil {
 			return err
 		}
 
-		for _, org := range cmd.Orgs {
+		if len(userOrgs) > 0 {
+			userOrgIDs := make([]string, 0, len(userOrgs))
+			for _, userOrg := range userOrgs {
+				userOrgIDs = append(userOrgIDs, fmt.Sprintf("%d", userOrg.OrgId))
+			}
+
+			_, err := sess.Exec(fmt.Sprintf("DELETE FROM org_user WHERE org_id NOT IN (%s) AND user_id = %d",
+				strings.Join(userOrgIDs, ", "),
+				cmd.UserID,
+			))
+
+			if err != nil {
+				return err
+			}
+		}
+
+		var orgID int64
+		for i, org := range cmd.Orgs {
 			var existingOrg *userOrgDTO
 			for _, userOrg := range userOrgs {
 				if userOrg.Name == org.Name {
@@ -149,7 +152,8 @@ func UpdateUserLogin(cmd *m.UpdateUserLoginCommand) error {
 			}
 
 			if existingOrg != nil {
-				_, err := sess.Id(existingOrg.ID).Update(&m.OrgUser{
+				orgID = existingOrg.OrgId
+				_, err := sess.Id(existingOrg.Id).Update(&m.OrgUser{
 					Role: org.Role,
 				})
 
@@ -164,6 +168,7 @@ func UpdateUserLogin(cmd *m.UpdateUserLoginCommand) error {
 				}
 
 				if has {
+					orgID = o.Id
 					orgUser := m.OrgUser{
 						OrgId:   o.Id,
 						UserId:  cmd.UserID,
@@ -177,6 +182,16 @@ func UpdateUserLogin(cmd *m.UpdateUserLoginCommand) error {
 					}
 				}
 			}
+
+			if i == 0 && orgID != 0 {
+				_, err := sess.Id(cmd.UserID).Update(&m.User{
+					OrgId: orgID,
+				})
+
+				if err != nil {
+					return err
+				}
+			}
 		}
 
 		return nil
@@ -188,23 +203,9 @@ func CreateUser(cmd *m.CreateUserCommand) error {
 		var err error
 		var orgs []*orgRole
 
-		if len(cmd.Orgs) > 0 {
-			orgs, err = getGroupsByName(cmd.Orgs, sess)
-
-			if err != nil {
-				return err
-			}
-		} else {
-			var org *m.Org
-			org, err = getOrgForNewUser(cmd, sess)
-			if err != nil {
-				return err
-			}
-
-			orgs = append(orgs, &orgRole{
-				org:  org,
-				role: m.ROLE_ADMIN,
-			})
+		orgs, err = getGroupsByName(cmd.Orgs, sess)
+		if err != nil {
+			return err
 		}
 
 		if cmd.Email == "" {
