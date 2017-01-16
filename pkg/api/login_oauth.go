@@ -130,7 +130,7 @@ func OAuthLogin(ctx *middleware.Context) {
 	token.TokenType = "Bearer"
 
 	if err := verifyScopes(token.AccessToken, connect.Scopes()); err != nil {
-		ctx.Handle(500, "login.OAuthLogin(verifyScopes)", err)
+		redirectWithError(ctx, LOGIN_PATH, err)
 		return
 	}
 
