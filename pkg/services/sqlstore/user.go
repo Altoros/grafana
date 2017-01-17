@@ -80,10 +80,10 @@ type orgRole struct {
 	role m.RoleType
 }
 
-func getGroupsByName(createUserOrgs []m.CreateOrgUserCommand, sess *session) ([]*orgRole, error) {
-	orgs := make([]*orgRole, 0, len(createUserOrgs))
+func getGroupsByName(cmd []m.CreateOrgUserCommand, sess *session) ([]*orgRole, error) {
+	orgs := make([]*orgRole, 0, len(cmd))
 
-	for _, userOrg := range createUserOrgs {
+	for _, userOrg := range cmd {
 		org := &m.Org{}
 		has, err := sess.Where("name = ?", userOrg.Name).Get(org)
 		if err != nil {
@@ -203,9 +203,21 @@ func CreateUser(cmd *m.CreateUserCommand) error {
 		var err error
 		var orgs []*orgRole
 
-		orgs, err = getGroupsByName(cmd.Orgs, sess)
-		if err != nil {
-			return err
+		if cmd.IsAdmin {
+			org, err := getOrgForNewUser(cmd, sess)
+			if err != nil {
+				return err
+			}
+
+			orgs = append(orgs, &orgRole{
+				org:  org,
+				role: m.ROLE_ADMIN,
+			})
+		} else {
+			orgs, err = getGroupsByName(cmd.Orgs, sess)
+			if err != nil {
+				return err
+			}
 		}
 
 		if cmd.Email == "" {
