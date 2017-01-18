@@ -280,10 +280,6 @@ func CreateUser(cmd *m.CreateUserCommand) error {
 
 		// create org user link
 		if !cmd.SkipOrgSetup {
-			if cmd.IsAdmin {
-				return nil
-			}
-
 			for _, o := range orgs {
 				orgUser := m.OrgUser{
 					OrgId:   o.org.Id,
