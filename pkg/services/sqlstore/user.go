@@ -12,6 +12,7 @@ import (
 	m "github.com/grafana/grafana/pkg/models"
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/util"
+	"strconv"
 )
 
 func init() {
@@ -125,23 +126,9 @@ func UpdateUserLogin(cmd *m.UpdateUserLoginCommand) error {
 			return err
 		}
 
-		if len(userOrgs) > 0 {
-			userOrgIDs := make([]string, 0, len(userOrgs))
-			for _, userOrg := range userOrgs {
-				userOrgIDs = append(userOrgIDs, fmt.Sprintf("%d", userOrg.OrgId))
-			}
-
-			_, err := sess.Exec(fmt.Sprintf("DELETE FROM org_user WHERE org_id NOT IN (%s) AND user_id = %d",
-				strings.Join(userOrgIDs, ", "),
-				cmd.UserID,
-			))
-
-			if err != nil {
-				return err
-			}
-		}
-
 		var orgID int64
+		var orgIDs []int64
+
 		for i, org := range cmd.Orgs {
 			var existingOrg *userOrgDTO
 			for _, userOrg := range userOrgs {
@@ -183,6 +170,11 @@ func UpdateUserLogin(cmd *m.UpdateUserLoginCommand) error {
 				}
 			}
 
+			if orgID != 0 {
+				orgIDs = append(orgIDs, orgID)
+			}
+
+			// update default group
 			if i == 0 && orgID != 0 {
 				_, err := sess.Id(cmd.UserID).Update(&m.User{
 					OrgId: orgID,
@@ -194,8 +186,30 @@ func UpdateUserLogin(cmd *m.UpdateUserLoginCommand) error {
 			}
 		}
 
+		// delete user->org relations where user is not a member of a group
+		_, err = sess.Exec(fmt.Sprintf("DELETE FROM org_user WHERE user_id = %d %s",
+			cmd.UserID,
+			notIn("org_id", orgIDs),
+		))
+
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
+}
+
+func notIn(field string, arr []int64) string {
+	s := make([]string, 0, len(arr))
+	for _, i := range arr {
+		s = append(s, strconv.FormatInt(i, 10))
+	}
+
+	if len(s) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("AND %s NOT IN(%s)", field, strings.Join(s, ", "))
 }
 
 func CreateUser(cmd *m.CreateUserCommand) error {
