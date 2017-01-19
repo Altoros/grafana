@@ -3,6 +3,7 @@ package sqlstore
 import (
 	"strings"
 	"time"
+	"errors"
 
 	"github.com/go-xorm/xorm"
 
@@ -194,6 +195,11 @@ func UpdateUserLogin(cmd *m.UpdateUserLoginCommand) error {
 
 		if err != nil {
 			return err
+		}
+
+		// we don't let login users without any orgs
+		if len(orgIDs) == 0 && !cmd.IsAdmin {
+			return errors.New("no groups found")
 		}
 
 		return nil
