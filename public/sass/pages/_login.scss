@@ -127,6 +127,14 @@
   }
 }
 
+.btn-cloudfoundry{
+  background-color: #444444;
+  img {
+    width: 13rem;
+    margin-bottom: -6px;
+  }
+}
+
 .password-recovery {
   background: $tight-form-bg;
   margin-top: 10px;
