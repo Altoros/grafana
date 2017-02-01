@@ -71,7 +71,6 @@
               <select class="gf-form-input" ng-model="link.timeFormat" ng-options="format for format in ['grafana','kibana']" ng-change="updated()"></select>
             </div>
           </div>
-          <editor-checkbox ng-show="link.keepTime" text="In Kibana format" model="link.kibanaFormat" change="updated()"></editor-checkbox>
 					<editor-checkbox text="Variable values" model="link.includeVars" change="updated()"></editor-checkbox>
 					<editor-checkbox text="Open in new tab " model="link.targetBlank" change="updated()"></editor-checkbox>
 				</div>
