@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/grafana/pkg/models"
 
 	"golang.org/x/oauth2"
+	"strings"
 )
 
 type SocialGithub struct {
@@ -208,4 +209,13 @@ func (s *SocialGithub) UserInfo(client *http.Client) (*BasicUserInfo, error) {
 	}
 
 	return userInfo, nil
+}
+
+func (s *SocialGithub) Scopes() []string {
+	return s.Config.Scopes
+}
+
+func (s *SocialGithub) TokenScopes(token *oauth2.Token) ([]string, error) {
+	scopes, _ := token.Extra("scope").(string)
+	return strings.Split(scopes, ","), nil
 }

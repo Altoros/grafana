@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
@@ -109,6 +110,17 @@ func OAuthLogin(ctx *middleware.Context) {
 	// token.TokenType was defaulting to "bearer", which is out of spec, so we explicitly set to "Bearer"
 	token.TokenType = "Bearer"
 
+	scopes, err := connect.TokenScopes(token)
+	if err != nil {
+		ctx.Handle(500, "login.OAuthLogin(TokenScopes)", err)
+		return
+	}
+
+	if err := verifyScopes(scopes, connect.Scopes()); err != nil {
+		ctx.Handle(500, "login.OAuthLogin(verifyScopes)", err)
+		return
+	}
+
 	ctx.Logger.Debug("OAuthLogin Got token")
 
 	// set up oauth2 client
@@ -178,4 +190,23 @@ func OAuthLogin(ctx *middleware.Context) {
 	metrics.M_Api_Login_OAuth.Inc(1)
 
 	ctx.Redirect(setting.AppSubUrl + "/")
+}
+
+func verifyScopes(got, want []string) error {
+	var missing []string
+
+loop:
+	for _, scope := range want {
+		for _, s := range got {
+			if scope == s {
+				continue loop
+			}
+		}
+		missing = append(missing, scope)
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required scopes: %s", strings.Join(missing, ", "))
+	}
+	return nil
 }
